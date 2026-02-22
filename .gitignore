@@ -1,0 +1,8 @@
+# Rust build directory
+/target/
+Cargo.lock
+
+# Compiled binaries (when using rustc directly)
+*.exe
+*.out
+*.app
