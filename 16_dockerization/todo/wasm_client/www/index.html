@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>WASM Todo App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+        }
+
+        input,
+        button {
+            padding: 8px;
+            font-size: 14px;
+        }
+
+        ul {
+            padding: 0;
+        }
+
+        li {
+            list-style: none;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .error {
+            color: #b00020;
+            background: #ffe6e6;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #ffb3b3;
+            display: none;
+        }
+
+        .loading {
+            font-size: 12px;
+            color: gray;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Todo App (Rust + WASM)</h2>
+
+    <div>
+        <input id="titleInput" type="text" placeholder="Enter todo..." />
+        <button id="addButton">Add</button>
+        <span id="loading" class="loading"></span>
+    </div>
+
+    <div id="errorBox" class="error"></div>
+
+    <ul id="todoList"></ul>
+
+    <script type="module">
+        import init, { fetch_todos, add_todo } from './pkg/wasm_client.js';
+
+        const todoList = document.getElementById('todoList');
+        const titleInput = document.getElementById('titleInput');
+        const addButton = document.getElementById('addButton');
+        const errorBox = document.getElementById('errorBox');
+        const loading = document.getElementById('loading');
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.style.display = 'block';
+        }
+
+        function clearError() {
+            errorBox.textContent = '';
+            errorBox.style.display = 'none';
+        }
+
+        function setLoading(state) {
+            loading.textContent = state ? 'Loading...' : '';
+            addButton.disabled = state;
+        }
+
+        function renderTodos(todos) {
+            todoList.innerHTML = '';
+
+            todos.forEach(todo => {
+                const li = document.createElement('li');
+                li.textContent = `${todo.id}: ${todo.title}`;
+                todoList.appendChild(li);
+            });
+        }
+
+        async function refreshTodos() {
+            clearError();
+            setLoading(true);
+
+            try {
+                const todos_json_string = await fetch_todos();
+                const todos = JSON.parse(todos_json_string);
+                renderTodos(todos);
+            } catch (e) {
+                console.error(e);
+                showError(`Failed to fetch todos: ${e.message || e}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function addNewTodo() {
+            const title = titleInput.value.trim();
+            if (!title) return;
+
+            clearError();
+            setLoading(true);
+
+            try {
+                await add_todo(title);
+                titleInput.value = '';
+                await refreshTodos();
+            } catch (e) {
+                console.error(e);
+                showError(`Failed to add todo: ${e.message || e}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function run() {
+            try {
+                setLoading(true);
+                await init();
+                await refreshTodos();
+            } catch (e) {
+                showError(`WASM init failed: ${e.message || e}`);
+            } finally {
+                setLoading(false);
+            }
+
+            addButton.addEventListener('click', addNewTodo);
+
+            titleInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addNewTodo();
+                }
+            });
+        }
+
+        run();
+    </script>
+
+</body>
+
+</html>
